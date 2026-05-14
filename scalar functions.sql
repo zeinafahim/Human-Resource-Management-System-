@@ -1,0 +1,190 @@
+-- Employee & Workforce Calculations
+DELIMITER //
+CREATE FUNCTION GetEmployeeFullName(empID INT) RETURNS VARCHAR(255)
+DETERMINISTIC
+BEGIN
+    DECLARE fullName VARCHAR(255);
+    SELECT CONCAT_WS(' ', First_Name, Middle_Name, Last_Name)
+    INTO fullName
+    FROM EMPLOYEE
+    WHERE Employee_ID = empID;
+    RETURN fullName;
+END //
+DELIMITER ;
+
+DELIMITER //
+CREATE FUNCTION GetEmployeeAge(empID INT) RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE empDOB DATE;
+    DECLARE empAge INT;
+    SELECT DOB INTO empDOB FROM EMPLOYEE WHERE Employee_ID = empID;
+    SET empAge = TIMESTAMPDIFF(YEAR, empDOB, CURDATE());
+    RETURN empAge;
+END //
+DELIMITER ;
+
+DELIMITER //
+CREATE FUNCTION GetEmployeeServiceYears(empID INT) RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE startDate DATE;
+    DECLARE serviceYears INT;
+    SELECT MIN(Start_Date) INTO startDate
+    FROM JOB_ASSIGNMENT
+    WHERE Employee_ID = empID;
+    
+    IF startDate IS NULL THEN
+        RETURN 0;
+    ELSE
+        SET serviceYears = TIMESTAMPDIFF(YEAR, startDate, CURDATE());
+        RETURN serviceYears;
+    END IF;
+END //
+DELIMITER ;
+
+-- Performance Calculations
+
+DELIMITER //
+CREATE FUNCTION GetKpiScore(kpiID INT, assignmentID INT, cycleID INT) RETURNS DECIMAL(5,2)
+DETERMINISTIC
+BEGIN
+    DECLARE score DECIMAL(5,2);
+    SELECT Employee_Score INTO score
+    FROM EMPLOYEE_KPI_SCORE
+    WHERE KPI_ID = kpiID AND Assignment_ID = assignmentID AND Performance_Cycle_ID = cycleID;
+    RETURN score;
+END //
+DELIMITER ;
+
+DELIMITER //
+CREATE FUNCTION GetWeightedKpiScore(kpiID INT, assignmentID INT, cycleID INT) RETURNS DECIMAL(5,2)
+DETERMINISTIC
+BEGIN
+    DECLARE weighted DECIMAL(5,2);
+    SELECT Employee_Score * (Weight / 100) INTO weighted
+    FROM EMPLOYEE_KPI_SCORE ek
+    JOIN OBJECTIVE_KPI k ON ek.KPI_ID = k.KPI_ID
+    WHERE ek.KPI_ID = kpiID AND ek.Assignment_ID = assignmentID AND ek.Performance_Cycle_ID = cycleID;
+    RETURN weighted;
+END //
+DELIMITER ;
+
+
+DELIMITER //
+CREATE FUNCTION GetTotalObjectiveWeight(jobID INT) RETURNS DECIMAL(5,2)
+DETERMINISTIC
+BEGIN
+    DECLARE totalWeight DECIMAL(5,2);
+    SELECT IFNULL(SUM(Weight),0) INTO totalWeight
+    FROM JOB_OBJECTIVE
+    WHERE Job_ID = jobID;
+    RETURN totalWeight;
+END //
+DELIMITER ;
+
+DELIMITER //
+CREATE FUNCTION GetCycleDuration(cycleID INT) RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE duration INT;
+    SELECT DATEDIFF(End_Date, Start_Date) INTO duration
+    FROM PERFORMANCE_CYCLE
+    WHERE Cycle_ID = cycleID;
+    RETURN duration;
+END //
+DELIMITER ;
+
+-- Dashboard Summary Calculations
+DELIMITER //
+CREATE FUNCTION GetTotalEmployees() RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE total INT;
+    SELECT COUNT(*) INTO total FROM EMPLOYEE;
+    RETURN total;
+END //
+DELIMITER ;
+
+DELIMITER //
+CREATE FUNCTION GetActiveEmployees() RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE total INT;
+    SELECT COUNT(*) INTO total FROM EMPLOYEE WHERE Employment_Status = 'Active';
+    RETURN total;
+END //
+DELIMITER ;
+
+
+DELIMITER //
+CREATE FUNCTION GetTotalJobs() RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE total INT;
+    SELECT COUNT(*) INTO total FROM JOB;
+    RETURN total;
+END //
+DELIMITER ;
+
+DELIMITER //
+CREATE FUNCTION GetActiveJobs() RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE total INT;
+    SELECT COUNT(*) INTO total
+    FROM JOB j
+    JOIN JOB_ASSIGNMENT ja ON j.Job_ID = ja.Job_ID
+    WHERE ja.Status = 'Active';
+    RETURN total;
+END //
+DELIMITER ;
+
+DELIMITER //
+CREATE FUNCTION GetTotalTrainingPrograms() RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE total INT;
+    SELECT COUNT(*) INTO total FROM TRAINING_PROGRAM;
+    RETURN total;
+END //
+DELIMITER ;
+
+
+DELIMITER //
+CREATE FUNCTION GetTotalCertificates() RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE total INT;
+    SELECT COUNT(*) INTO total FROM TRAINING_CERTIFICATE;
+    RETURN total;
+END //
+DELIMITER ;
+
+DELIMITER //
+CREATE FUNCTION GetKpiCompletionRate() RETURNS DECIMAL(5,2)
+DETERMINISTIC
+BEGIN
+    DECLARE totalKPI INT;
+    DECLARE scoredKPI INT;
+    
+    SELECT COUNT(*) INTO totalKPI FROM EMPLOYEE_KPI_SCORE;
+    SELECT COUNT(*) INTO scoredKPI FROM EMPLOYEE_KPI_SCORE WHERE Employee_Score IS NOT NULL;
+    
+    IF totalKPI = 0 THEN
+        RETURN 0;
+    ELSE
+        RETURN (scoredKPI / totalKPI) * 100;
+    END IF;
+END //
+DELIMITER ;
+
+DELIMITER //
+CREATE FUNCTION GetAverageAppraisalScore() RETURNS DECIMAL(5,2)
+DETERMINISTIC
+BEGIN
+    DECLARE avgScore DECIMAL(5,2);
+    SELECT IFNULL(AVG(Overall_Score),0) INTO avgScore FROM APPRAISAL;
+    RETURN avgScore;
+END //
+DELIMITER ;
